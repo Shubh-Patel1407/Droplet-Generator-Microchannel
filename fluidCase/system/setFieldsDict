@@ -25,8 +25,8 @@ zones
     {
         type            sphere;
 
-        centre          (0.0045 0 0);
-        radius          0.00115;
+        centre          (0.003 0 0);
+        radius          0.0012;
 
         values
         {

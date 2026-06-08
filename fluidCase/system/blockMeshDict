@@ -21,8 +21,8 @@ coreHalf        0.001;
 radiusNeg      -0.002;
 coreHalfNeg    -0.001;
 
-nR              8;
-nX              160;
+nR              6;
+nX              100;
 
 geometry
 {
