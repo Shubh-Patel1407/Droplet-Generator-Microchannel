@@ -1,0 +1,73 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+  =========                 |
+  \\      /  F ield         | OpenFOAM: The Open Source CFD Toolbox
+   \\    /   O peration     | Website:  https://openfoam.org
+    \\  /    A nd           | Version:  13
+     \\/     M anipulation  |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    format      ascii;
+    class       volVectorField;
+    location    "0";
+    object      U;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+dimensions      [0 1 -1 0 0 0 0];
+
+internalField   uniform (0.0 0 0);
+
+boundaryField
+{
+    inlet
+    {
+        type            codedFixedValue;
+        value           $internalField;
+        
+        name    poiseuillePipeProfile;
+        code
+        #{
+            const vectorField& Cf = patch().Cf();
+            const scalarField& y = Cf.component(vector::Y);
+            const scalarField& z = Cf.component(vector::Z);
+            
+            // Pipe radius from geometry
+            scalar R = 0.002;  // 2 mm inner radius
+            scalar uMax = 0.30; // Maximum centerline velocity
+            
+            // Radius from axis: r_perp = sqrt(y^2 + z^2)
+            scalarField rPerp = sqrt(y*y + z*z);
+            
+            // Poiseuille profile: u(r) = uMax * (1 - (r/R)^2)
+            scalarField uProfile = uMax * max(scalar(0), scalar(1) - (rPerp/R)*(rPerp/R));
+            
+            // Apply profile to all three components
+            vectorField result(patch().size());
+            result.replace(vector::X, uProfile);
+            result.replace(vector::Y, 0.0);
+            result.replace(vector::Z, 0.0);
+            
+            operator==(result);
+        #};
+        
+        codeInclude
+        #{
+            #include "fvCFD.H"
+        #};
+    }
+
+    outlet
+    {
+        type            pressureInletOutletVelocity;
+        value           $internalField;
+        inletValue      uniform (0.20 0 0);
+    }
+
+    pipeWall
+    {
+        type            noSlip;
+    }
+}
+
+// ************************************************************************* //

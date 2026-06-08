@@ -1,0 +1,17 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "username": "researcher",
+  "permission": {
+    "bash": "ask",
+    "edit": "ask",
+    "glob": "allow",
+    "grep": "allow",
+    "read": "allow",
+    "webfetch": "allow",
+    "websearch": "allow",
+    "list": "allow",
+    "task": "ask",
+    "todowrite": "allow",
+    "question": "allow"
+  }
+}
