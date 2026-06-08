@@ -43,6 +43,7 @@ postProcessing/
 log.*
 *.foam
 
+opencode.json
 # Simulation outputs
 output/
 output_*/
