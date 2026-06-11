@@ -20,20 +20,20 @@ FoamFile
     {
         type            patch;
         nFaces          180;
-        startFace       52620;
+        startFace       149772;
     }
     outlet
     {
         type            patch;
         nFaces          180;
-        startFace       52800;
+        startFace       149952;
     }
     pipeWall
     {
         type            wall;
         inGroups        List<word> 1(wall);
-        nFaces          2400;
-        startFace       52980;
+        nFaces          6816;
+        startFace       150132;
     }
 )
 

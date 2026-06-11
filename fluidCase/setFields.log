@@ -8,9 +8,9 @@
 Build  : 13-441953dfbb42
 Exec   : setFields
 Date   : Jun 11 2026
-Time   : 17:32:53
+Time   : 20:44:33
 Host   : "Shubh"
-PID    : 1470
+PID    : 1964
 I/O    : uncollated
 Case   : /home/shubh/Droplet-Generator-Microchannel/fluidCase
 nProcs : 1
@@ -28,14 +28,9 @@ Reading "setFieldsDict"
 Setting field default values
     Setting volScalarField::Internal alpha.water
 
+Setting field zone values
+Zone: droplet
+    Setting volScalarField::Internal alpha.water
 
---> FOAM FATAL IO ERROR: 
-size 51200 is not equal to the given value of 18000
-
-file: /home/shubh/Droplet-Generator-Microchannel/fluidCase/0/alpha.water from line 17 to 51240.
-
-    From function Foam::Field<Type>::Field(const Foam::word&, const Foam::unitConversion&, const Foam::dictionary&, Foam::label) [with Type = double; Foam::label = int]
-    in file /home/ubuntu/OpenFOAM/OpenFOAM-13/src/OpenFOAM/lnInclude/Field.C at line 229.
-
-FOAM exiting
+End
 
