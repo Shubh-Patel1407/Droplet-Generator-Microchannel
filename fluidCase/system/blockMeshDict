@@ -23,7 +23,7 @@ radiusNeg      -0.002;
 coreHalfNeg    -0.001;
 
 nR              6;
-nX              100;
+nX              284;
 
 geometry
 {
