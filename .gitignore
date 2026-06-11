@@ -44,13 +44,7 @@ log.*
 *.foam
 
 opencode.json
-# Simulation outputs
-output/
-output_*/
-results/
-*.gif
-*.png
-*.jpg
+#*.jpg
 
 # Temporary files
 *.tmp
