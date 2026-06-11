@@ -1,0 +1,41 @@
+/*---------------------------------------------------------------------------*\
+  =========                 |
+  \\      /  F ield         | OpenFOAM: The Open Source CFD Toolbox
+   \\    /   O peration     | Website:  https://openfoam.org
+    \\  /    A nd           | Version:  13
+     \\/     M anipulation  |
+\*---------------------------------------------------------------------------*/
+Build  : 13-441953dfbb42
+Exec   : setFields
+Date   : Jun 11 2026
+Time   : 17:32:53
+Host   : "Shubh"
+PID    : 1470
+I/O    : uncollated
+Case   : /home/shubh/Droplet-Generator-Microchannel/fluidCase
+nProcs : 1
+sigFpe : Enabling floating point exception trapping (FOAM_SIGFPE).
+fileModificationChecking : Monitoring run-time modified files using timeStampMaster (fileModificationSkew 10)
+allowSystemOperations : Allowing user-supplied system call operations
+
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+Create time
+
+Create mesh for time = 0
+
+Reading "setFieldsDict"
+
+Setting field default values
+    Setting volScalarField::Internal alpha.water
+
+
+--> FOAM FATAL IO ERROR: 
+size 51200 is not equal to the given value of 18000
+
+file: /home/shubh/Droplet-Generator-Microchannel/fluidCase/0/alpha.water from line 17 to 51240.
+
+    From function Foam::Field<Type>::Field(const Foam::word&, const Foam::unitConversion&, const Foam::dictionary&, Foam::label) [with Type = double; Foam::label = int]
+    in file /home/ubuntu/OpenFOAM/OpenFOAM-13/src/OpenFOAM/lnInclude/Field.C at line 229.
+
+FOAM exiting
+
