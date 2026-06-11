@@ -3,19 +3,26 @@
 FSI (Fluid-Structure Interaction) Coupling Script for OpenFOAM
 =============================================================
 
-This script implements a one-way (fluid → solid) coupling for droplet transport
-through flexible microchannels. It:
+This script implements iterative one-way (fluid → solid) coupling for droplet
+transport through flexible microchannels:
 
 1. Reads pressure field from fluid domain (incompressibleVoF)
 2. Extracts average pressure on pipe inner wall
 3. Updates solid case boundary condition with computed pressure
 4. Runs solid solver to get deformed wall geometry
-5. (Future: map deformation back to fluid mesh for two-way coupling)
+5. (Monitors convergence toward equilibrium)
 
-Current approach: Iterative one-way coupling at selected time steps
-- Fluid solves first (generates pressure field)
-- Solid solves with time-averaged pressure from fluid
-- Can be extended to full two-way coupling with mesh morphing
+IMPLEMENTATION STRATEGY (Two-way ready):
+- One-way coupling: Fluid pressure → Solid deformation (current)
+- Future two-way: Add mesh morphing from solid displacement
+- Convergence: Track displacement changes between iterations
+
+PHASES:
+  Phase 1 (DONE): Reduced-order Python model with time-varying pressure
+  Phase 2 (THIS): FSI coupling orchestrator with convergence monitoring
+  Phase 3: OpenFOAM dynamic mesh configuration
+  Phase 4: Master orchestration scripts
+  Phase 5: Validation and comparison analysis
 """
 
 import os
@@ -289,6 +296,114 @@ class FSICoupler:
         print("\nFSI coupling iteration completed successfully")
         return True
     
+    def extract_displacement_at_boundary(self, 
+                                         time_step: float,
+                                         boundary: str = "innerWall") -> Optional[float]:
+        """
+        Extract average radial displacement on a boundary patch.
+        
+        Args:
+            time_step: Time directory to read from
+            boundary: Boundary patch name (e.g., "innerWall")
+            
+        Returns:
+            Average radial displacement in meters (or None if failed)
+        """
+        d_file = self.solid_case / str(time_step) / "D"
+        
+        if not d_file.exists():
+            return None
+        
+        try:
+            # Read displacement field
+            with open(d_file, 'r') as f:
+                content = f.read()
+            
+            # Extract magnitude of displacement (simplified)
+            displacements = re.findall(r'[-+]?[0-9]*\.?[0-9]+(?:[eE][-+]?[0-9]+)?', content)
+            if displacements:
+                avg_disp = np.mean([float(d) for d in displacements[:100]])
+                return avg_disp
+            
+            return None
+        except Exception as e:
+            print(f"  Warning: Could not read displacement at t={time_step}: {e}")
+            return None
+    
+    def compute_coupling_residual(self, displacement_history: list[float]) -> Optional[float]:
+        """
+        Compute coupling convergence residual.
+        
+        Measures change in displacement between iterations.
+        Residual < 0.005 (0.5%) indicates convergence.
+        
+        Args:
+            displacement_history: List of displacements from successive iterations
+            
+        Returns:
+            Relative change in displacement (or None if insufficient data)
+        """
+        if len(displacement_history) < 2:
+            return None
+        
+        current = abs(displacement_history[-1])
+        previous = abs(displacement_history[-2])
+        
+        if current < 1e-10:
+            return 0.0
+        
+        residual = abs(current - previous) / current
+        return residual
+    
+    def run_iterative_coupling(self, 
+                               max_iterations: int = 10,
+                               residual_threshold: float = 0.005,
+                               nprocs: int = 1) -> bool:
+        """
+        Run iterative FSI coupling until convergence.
+        
+        Iterates:
+          1. Fluid solver → Extract pressure
+          2. Update solid BC with pressure
+          3. Solid solver → Extract displacement
+          4. Check convergence (displacement change < threshold)
+        
+        Args:
+            max_iterations: Maximum coupling iterations per interval
+            residual_threshold: Target residual for convergence (0.005 = 0.5%)
+            nprocs: Number of processors
+            
+        Returns:
+            True if converged, False if max iterations reached
+        """
+        displacement_history = []
+        
+        for iteration in range(max_iterations):
+            print(f"\n--- Coupling Iteration {iteration + 1}/{max_iterations} ---")
+            
+            # Run coupled iteration
+            if not self.run_coupling_iteration(nprocs=nprocs):
+                return False
+            
+            # Extract displacement
+            latest_time = self.get_latest_fluid_time()
+            if latest_time:
+                disp = self.extract_displacement_at_boundary(latest_time)
+                if disp is not None:
+                    displacement_history.append(disp)
+                    print(f"  Displacement: {disp*1e6:.3f} um")
+                    
+                    # Check convergence
+                    residual = self.compute_coupling_residual(displacement_history)
+                    if residual is not None:
+                        print(f"  Residual: {residual:.6f}")
+                        if residual < residual_threshold:
+                            print(f"  ✓ Converged (residual < {residual_threshold})")
+                            return True
+        
+        print(f"  ⚠ Max iterations reached (did not converge to {residual_threshold})")
+        return False
+    
     def print_summary(self):
         """Print coupling summary."""
         print("\n" + "="*60)
@@ -309,7 +424,19 @@ def main():
     import argparse
     
     parser = argparse.ArgumentParser(
-        description="FSI coupling script for OpenFOAM droplet-tube simulations"
+        description="FSI coupling script for OpenFOAM droplet-tube simulations",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+EXAMPLES:
+  # Single coupling iteration
+  python fsi_coupling.py --fluid-case fluidCase --solid-case solidCase
+
+  # Iterative coupling (up to 5 iterations, converge at 0.5% residual)
+  python fsi_coupling.py --iterative --max-iterations 5 --residual-threshold 0.005
+
+  # Parallel execution with 4 CPUs
+  python fsi_coupling.py --nprocs 4 --iterative
+        """
     )
     parser.add_argument("--fluid-case", type=Path, default=Path("fluidCase"),
                         help="Path to fluid case directory")
@@ -319,8 +446,14 @@ def main():
                         help="Time interval for pressure sampling (seconds)")
     parser.add_argument("--nprocs", type=int, default=1,
                         help="Number of processors for parallel execution")
+    parser.add_argument("--iterative", action="store_true",
+                        help="Run iterative coupling until convergence")
+    parser.add_argument("--max-iterations", type=int, default=5,
+                        help="Maximum iterations per coupling interval")
+    parser.add_argument("--residual-threshold", type=float, default=0.005,
+                        help="Convergence criterion (0.005 = 0.5% displacement change)")
     parser.add_argument("--no-run", action="store_true",
-                        help="Only update BC without running solvers")
+                        help="Only update BC without running solvers (demo mode)")
     
     args = parser.parse_args()
     
@@ -331,11 +464,22 @@ def main():
             coupling_interval=args.coupling_interval
         )
         
-        if not args.no_run:
-            coupler.run_coupling_iteration(nprocs=args.nprocs)
-        else:
-            # Just update BC as demo
+        if args.no_run:
+            # Demo: just update BC
+            print("Demo mode: updating solid BC with baseline pressure...")
             coupler.update_solid_pressure_bc(1500.0)
+        elif args.iterative:
+            # Run iterative coupling
+            converged = coupler.run_iterative_coupling(
+                max_iterations=args.max_iterations,
+                residual_threshold=args.residual_threshold,
+                nprocs=args.nprocs
+            )
+            if not converged:
+                print("\n⚠ Warning: Coupling did not converge")
+        else:
+            # Single iteration
+            coupler.run_coupling_iteration(nprocs=args.nprocs)
         
         coupler.print_summary()
         

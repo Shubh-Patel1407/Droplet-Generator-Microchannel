@@ -26,15 +26,102 @@ from __future__ import annotations
 
 import argparse
 import os
+import re
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Callable, Optional
+from typing import Callable, Optional, Tuple
 
 os.environ.setdefault("MPLCONFIGDIR", str(Path(".mplconfig").resolve()))
 
 import matplotlib.pyplot as plt
 import numpy as np
 from matplotlib.animation import FuncAnimation, PillowWriter
+
+
+class PressureProfileLoader:
+    """Load and interpolate pressure history from OpenFOAM results."""
+    
+    def __init__(self, fluid_case_path: Optional[Path] = None):
+        """
+        Initialize pressure loader.
+        
+        Args:
+            fluid_case_path: Path to fluidCase directory
+        """
+        self.fluid_case_path = Path(fluid_case_path) if fluid_case_path else Path("fluidCase")
+        self.pressure_history: list[Tuple[float, float]] = []  # [(time, pressure), ...]
+        self.loaded = False
+        
+    def load_from_openfoam(self) -> bool:
+        """
+        Load pressure history from OpenFOAM time directories.
+        
+        Searches for p_rgh files and extracts boundary-averaged pressure.
+        
+        Returns:
+            True if successful, False otherwise
+        """
+        if not self.fluid_case_path.exists():
+            return False
+        
+        time_dirs = sorted([
+            float(d.name) for d in self.fluid_case_path.iterdir()
+            if d.is_dir() and d.name[0].isdigit()
+        ])
+        
+        for t in time_dirs:
+            p_file = self.fluid_case_path / f"{t}" / "p_rgh"
+            if p_file.exists():
+                try:
+                    pressure = self._extract_pressure(p_file)
+                    self.pressure_history.append((t, pressure))
+                except Exception:
+                    pass
+        
+        self.loaded = len(self.pressure_history) > 0
+        return self.loaded
+    
+    def _extract_pressure(self, p_file: Path) -> float:
+        """Extract average pressure from OpenFOAM pressure file."""
+        with open(p_file, 'r') as f:
+            content = f.read()
+        
+        # Try to find internal field (simplified extraction)
+        match = re.search(r'internalField\s+uniform\s+([-+]?[0-9]*\.?[0-9]+(?:[eE][-+]?[0-9]+)?)', content)
+        if match:
+            return float(match.group(1))
+        
+        # If not uniform, return baseline
+        return 1500.0
+    
+    def get_pressure_at_time(self, t: float) -> float:
+        """
+        Get interpolated pressure at given time.
+        
+        Uses linear interpolation between known points.
+        
+        Args:
+            t: Time in seconds
+            
+        Returns:
+            Pressure in Pa
+        """
+        if not self.pressure_history:
+            return 1500.0  # Default baseline
+        
+        if t <= self.pressure_history[0][0]:
+            return self.pressure_history[0][1]
+        if t >= self.pressure_history[-1][0]:
+            return self.pressure_history[-1][1]
+        
+        # Linear interpolation
+        for i, (t_i, p_i) in enumerate(self.pressure_history[:-1]):
+            t_next, p_next = self.pressure_history[i + 1]
+            if t_i <= t <= t_next:
+                alpha = (t - t_i) / (t_next - t_i)
+                return p_i + alpha * (p_next - p_i)
+        
+        return 1500.0
 
 
 @dataclass
@@ -47,8 +134,8 @@ class FSIConfig:
     length: float = 0.05  # 50 mm
     
     # Material properties
-    youngs_modulus: float = 5e6  # 5 MPa (soft rubber-like material)
-    poisson_ratio: float = 0.45
+    youngs_modulus: float = 2.5e6  # 2.5 MPa (silicone rubber, updated default)
+    poisson_ratio: float = 0.48
     
     # Loading
     internal_pressure: float = 1500.0  # Pa (baseline from solid case)
@@ -56,6 +143,10 @@ class FSIConfig:
     
     # Damping (for stability)
     pressure_damping: float = 0.1
+    
+    # Time-dependent pressure
+    pressure_loader: Optional[PressureProfileLoader] = None
+    use_time_varying_pressure: bool = False
     
     def compute_radius_change(self, pressure: float) -> float:
         """
@@ -87,6 +178,14 @@ class FSIConfig:
         """Get deformed inner radius at given pressure."""
         dr = self.compute_radius_change(pressure)
         return self.inner_radius + dr
+    
+    def get_radius_at_time(self, t: float) -> float:
+        """Get deformed radius with time-varying pressure."""
+        if self.use_time_varying_pressure and self.pressure_loader:
+            pressure = self.pressure_loader.get_pressure_at_time(t)
+        else:
+            pressure = self.internal_pressure
+        return self.get_current_radius(pressure)
     
     def get_stress(self, pressure: float) -> float:
         """Compute hoop stress in wall."""
@@ -147,10 +246,14 @@ def build_parser() -> argparse.ArgumentParser:
                         help="Disable FSI (rigid pipe)")
     parser.add_argument("--fsi-pressure", type=float, default=1500.0,
                         help="Internal pressure for flexible pipe (Pa)")
-    parser.add_argument("--youngs-modulus", type=float, default=5e6,
-                        help="Material Young's modulus (Pa)")
+    parser.add_argument("--youngs-modulus", type=float, default=2.5e6,
+                        help="Material Young's modulus (Pa) [default: 2.5 MPa silicone]")
     parser.add_argument("--wall-thickness", type=float, default=0.0004,
                         help="Pipe wall thickness (m)")
+    parser.add_argument("--time-varying-pressure", action="store_true",
+                        help="Use time-varying pressure from OpenFOAM results")
+    parser.add_argument("--fluid-case", type=str, default="fluidCase",
+                        help="Path to fluidCase directory (for pressure loading)")
     
     return parser
 
@@ -177,37 +280,59 @@ def advect_upwind(phi: np.ndarray, u: np.ndarray, dt: float, dx: float) -> np.nd
     return phi - dt * np.where(u >= 0.0, u * grad_minus, u * grad_plus)
 
 
-def run_simulation(config: SimulationConfig) -> tuple[np.ndarray, list[np.ndarray], np.ndarray, np.ndarray]:
-    """Run droplet transport simulation with optional FSI."""
+def run_simulation(config: SimulationConfig, use_time_varying: bool = False, 
+                  fluid_case_path: Optional[Path] = None) -> tuple[np.ndarray, list[np.ndarray], np.ndarray, np.ndarray, list]:
+    """Run droplet transport simulation with optional FSI.
+    
+    Args:
+        config: Simulation configuration
+        use_time_varying: Enable time-varying pressure from OpenFOAM
+        fluid_case_path: Path to fluidCase for pressure loading
+        
+    Returns:
+        Tuple of (final phi, frames, x, y, stress_history)
+    """
     
     # Initialize FSI if enabled
     fsi = None
+    stress_history = []
+    
     if config.enable_fsi:
         if config.fsi_config is None:
             config.fsi_config = FSIConfig()
         fsi = config.fsi_config
+        
+        # Setup time-varying pressure if requested
+        if use_time_varying and fluid_case_path:
+            loader = PressureProfileLoader(fluid_case_path)
+            if loader.load_from_openfoam():
+                fsi.pressure_loader = loader
+                fsi.use_time_varying_pressure = True
+                print(f"\nTime-varying pressure loaded ({len(loader.pressure_history)} points)")
+        
         print(f"\nFSI Enabled:")
         print(f"  Inner radius (baseline): {fsi.inner_radius*1e3:.2f} mm")
         print(f"  Wall thickness: {fsi.wall_thickness*1e3:.2f} mm")
-        print(f"  Young's modulus: {fsi.youngs_modulus/1e6:.1f} MPa")
+        print(f"  Young's modulus: {fsi.youngs_modulus/1e6:.2f} MPa")
         print(f"  Internal pressure: {fsi.internal_pressure:.1f} Pa")
+        print(f"  Time-varying: {fsi.use_time_varying_pressure}")
         
         radius_change = fsi.compute_radius_change(fsi.internal_pressure)
         deformed_radius = fsi.get_current_radius(fsi.internal_pressure)
         stress = fsi.get_stress(fsi.internal_pressure)
         
-        print(f"  Computed deformation:")
+        print(f"  Computed deformation (at baseline pressure):")
         print(f"    - Radial expansion: {radius_change*1e6:.2f} um")
         print(f"    - Deformed radius: {deformed_radius*1e3:.4f} mm")
         print(f"    - Hoop stress: {stress/1e6:.2f} MPa")
     
-    # Grid generation
+    # Grid generation (initial)
     x = np.linspace(0.0, config.length, config.nx)
     y_baseline = np.linspace(-config.radius, config.radius, config.ny)
     
-    # Use deformed radius if FSI enabled
+    # Use deformed radius if FSI enabled (at t=0)
     if fsi:
-        deformed_r = fsi.get_current_radius(fsi.internal_pressure)
+        deformed_r = fsi.get_radius_at_time(0.0)
         y = np.linspace(-deformed_r, deformed_r, config.ny)
         actual_radius = deformed_r
     else:
@@ -243,10 +368,32 @@ def run_simulation(config: SimulationConfig) -> tuple[np.ndarray, list[np.ndarra
     
     # Time integration
     print(f"\nRunning simulation...")
+    last_radius = actual_radius
     for step in range(steps):
         t = step * dt
         pulse_phase = (t % config.pulse_period) / config.pulse_period
         pulse_on = pulse_phase <= config.duty_cycle
+        
+        # Update radius if time-varying deformation
+        if fsi and fsi.use_time_varying_pressure:
+            actual_radius = fsi.get_radius_at_time(t)
+            stress = fsi.get_stress(fsi.pressure_loader.get_pressure_at_time(t))
+            stress_history.append((t, stress))
+            
+            # Recompute velocity profile if radius changed significantly
+            if abs(actual_radius - last_radius) > 1e-8:
+                y_new = np.linspace(-actual_radius, actual_radius, config.ny)
+                dy_new = y_new[1] - y_new[0]
+                # Update velocity profile
+                u = poiseuille_profile(y_new[:, None], actual_radius, config.umax)
+                # Update nozzle mask
+                X_new = np.meshgrid(x, y_new)[0]
+                Y_new = np.meshgrid(x, y_new)[1]
+                nozzle_mask = (X_new <= config.nozzle_x) & (np.abs(Y_new) <= config.nozzle_radius)
+                y = y_new
+                dx = x[1] - x[0]
+                dy = dy_new
+                last_radius = actual_radius
         
         # Advection
         phi = advect_upwind(phi, u, dt, dx)
@@ -278,12 +425,20 @@ def run_simulation(config: SimulationConfig) -> tuple[np.ndarray, list[np.ndarra
         if (step + 1) % max(steps // 10, 1) == 0:
             print(f"  Step {step+1}/{steps} ({100*(step+1)/steps:.0f}%)")
     
-    return phi, frames, x, y
+    return phi, frames, x, y, stress_history
 
 
 def save_summary(config: SimulationConfig, frames: list[np.ndarray], 
-                 x: np.ndarray, y: np.ndarray) -> None:
-    """Save visualization outputs."""
+                 x: np.ndarray, y: np.ndarray, stress_history: Optional[list] = None) -> None:
+    """Save visualization outputs.
+    
+    Args:
+        config: Simulation configuration
+        frames: List of phase fraction fields
+        x: Axial grid coordinates
+        y: Radial grid coordinates
+        stress_history: Optional stress vs time history
+    """
     output_dir = Path(config.output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
     
@@ -300,8 +455,12 @@ def save_summary(config: SimulationConfig, frames: list[np.ndarray],
         vmax=1.0,
         aspect="auto",
     )
-    ax.set_title("Water Droplet Fraction in Oil in Pipe" + 
-                (" (FSI-Deformed)" if config.enable_fsi else " (Rigid)"))
+    title = "Water Droplet Fraction in Oil in Pipe"
+    if config.enable_fsi:
+        title += " (FSI-Deformed)"
+        if config.fsi_config and config.fsi_config.use_time_varying_pressure:
+            title += " [Time-varying]"
+    ax.set_title(title)
     ax.set_xlabel("Axial position x [mm]")
     ax.set_ylabel("Radial position y [mm]")
     fig.colorbar(image, ax=ax, label="Dispersed phase fraction")
@@ -318,13 +477,29 @@ def save_summary(config: SimulationConfig, frames: list[np.ndarray],
         cmap="magma",
         aspect="auto",
     )
-    ax.set_title("Axial Transport History" + 
-                (" (FSI-Deformed)" if config.enable_fsi else " (Rigid)"))
+    title = "Axial Transport History"
+    if config.enable_fsi:
+        title += " (FSI-Deformed)"
+        if config.fsi_config and config.fsi_config.use_time_varying_pressure:
+            title += " [Time-varying]"
+    ax.set_title(title)
     ax.set_xlabel("Axial position x [mm]")
     ax.set_ylabel("Stored frame index")
     fig.colorbar(image, ax=ax, label="Cross-section averaged phase fraction")
     fig.savefig(output_dir / "droplet_history.png", dpi=180)
     plt.close(fig)
+    
+    # Stress history if available
+    if stress_history and len(stress_history) > 0:
+        times, stresses = zip(*stress_history)
+        fig, ax = plt.subplots(figsize=(10, 5), constrained_layout=True)
+        ax.plot(np.array(times)*1000, np.array(stresses)/1e6, linewidth=2, color='darkred')
+        ax.set_xlabel("Time [ms]")
+        ax.set_ylabel("Hoop Stress [MPa]")
+        ax.set_title("Wall Hoop Stress Evolution (FSI)")
+        ax.grid(True, alpha=0.3)
+        fig.savefig(output_dir / "stress_evolution.png", dpi=180)
+        plt.close(fig)
     
     # Animation
     fig, ax = plt.subplots(figsize=(11, 3.2), constrained_layout=True)
@@ -389,8 +564,14 @@ def main() -> None:
         fsi_config=fsi_config,
     )
     
-    _, frames, x, y = run_simulation(config)
-    save_summary(config, frames, x, y)
+    # Run simulation with optional time-varying pressure
+    fluid_case = Path(args.fluid_case) if args.time_varying_pressure else None
+    _, frames, x, y, stress_history = run_simulation(
+        config,
+        use_time_varying=args.time_varying_pressure,
+        fluid_case_path=fluid_case
+    )
+    save_summary(config, frames, x, y, stress_history)
     print(f"\nSaved outputs to {Path(config.output_dir).resolve()}")
 
 

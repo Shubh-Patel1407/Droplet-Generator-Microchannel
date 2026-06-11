@@ -34,13 +34,13 @@ class SimulationConfig:
     radius: float = 0.002
     nx: int = 320
     ny: int = 96
-    total_time: float = 0.25
-    cfl: float = 0.35
+    total_time: float = 3.0
+    cfl: float = 0.5
     umax: float = 0.12
     diffusivity: float = 1.5e-7
     nozzle_radius: float = 0.00045
     nozzle_x: float = 0.0015
-    pulse_period: float = 0.025
+    pulse_period: float = 0.15
     duty_cycle: float = 0.32
     injection_strength: float = 28.0
     purge_strength: float = 18.0
