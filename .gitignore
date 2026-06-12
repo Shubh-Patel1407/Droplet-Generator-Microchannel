@@ -66,3 +66,33 @@ Thumbs.db
 
 # Mesh files (generated)
 *.msh
+
+# Presentation and helper files (not for repository)
+PRESENTATION_GUIDE.md
+PRESENTATION_CHEAT_SHEET.md
+PRESENTATION_VISUALS_README.md
+QUICK_REFERENCE_CARD.md
+STEP_BY_STEP_COMMANDS.md
+TERMINAL_VISUAL_GUIDE.md
+VISUALIZATION_GUIDE.md
+FIXES_APPLIED.md
+REPOSITORY_GUIDE.md
+COMPLETE_RESTRUCTURE_SUMMARY.md
+
+# Visualization outputs (generated files)
+*.gif
+*.mp4
+*.avi
+presentation_visuals/
+output/
+output_validation/
+output_fsi/
+output_rigid/
+
+# Generated plots
+*.png
+!docs/*.png
+
+# Helper scripts output
+__pycache__/
+*.pyc
