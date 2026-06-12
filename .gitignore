@@ -66,11 +66,21 @@ Thumbs.db
 # Mesh files (generated)
 *.msh
 
+COMPLETE_RESTRUCTURE_SUMMARY.md
+FIXES_APPLIED.md
+PRESENTATION_CHEAT_SHEET.md
+PRESENTATION_VISUALS_README.md
+PROJECT_FSI_INFO.md
+QUICK_REFERENCE_CARD.md
+SIMULATION_GUIDE.md
+STEP_BY_STEP_COMMANDS.md
+TERMINAL_VISUAL_GUIDE.md
+VISUALIZATION_GUIDE.md
+
+droplet_pipe_fsi_sim.py
 # Markdown files - exclude all except README.md
 *.md
 !README.md
-!COMPLETE_RESTRUCTURE_SUMMARY.md
-!FIXES_APPLIES.md
 # Helper scripts to exclude
 generate_all_visuals.py
 opencode.json
