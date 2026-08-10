@@ -4,9 +4,9 @@
 
 The comparison uses a published droplet-diameter correlation:
 
-\[
+$$
 \frac{D}{W}=1.97064(1+K_p)^{-0.0655}r^{0.13593}\lambda^{-0.0273}
-\]
+$$
 
 The inputs are:
 
@@ -27,23 +27,23 @@ OpenFOAM's `regionSizeDistribution` function identifies disconnected water
 regions using `alpha.water > 0.5`. The largest detected detached-region
 volume, `V`, is converted to projected area using the channel height:
 
-\[
+$$
 A=\frac{V}{h}
-\]
+$$
 
 An area-equivalent top-view diameter is then calculated:
 
-\[
+$$
 D_{CFD}=\sqrt{\frac{4V}{\pi h}}
-\]
+$$
 
 The rigid case uses `h = 100 um`; the flexible case uses `h = 93.5 um`.
 
 The percentage difference is:
 
-\[
+$$
 \mathrm{difference}=100\frac{D_{CFD}-D_{reference}}{D_{reference}}
-\]
+$$
 
 ## Results
 
@@ -65,4 +65,3 @@ post-processing output.
   area-equivalent top-view approximation.
 - The current differences are substantial and should not be reported as
   agreement within a validation tolerance.
-
