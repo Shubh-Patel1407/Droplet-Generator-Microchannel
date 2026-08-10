@@ -1,0 +1,2 @@
+FoamFile { format ascii; class dictionary; object physicalProperties.water; }
+#include "../../common/physicalProperties.water"

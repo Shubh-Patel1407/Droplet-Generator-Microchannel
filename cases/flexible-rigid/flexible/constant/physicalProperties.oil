@@ -1,0 +1,2 @@
+FoamFile { format ascii; class dictionary; object physicalProperties.oil; }
+#include "../../common/physicalProperties.oil"

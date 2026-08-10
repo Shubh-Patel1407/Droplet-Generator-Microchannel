@@ -1,0 +1,25 @@
+dimensions      [0 1 -1 0 0 0 0];
+internalField   uniform (0 0 0);
+boundaryField
+{
+    oilInlet
+    {
+        type                flowRateInletVelocity;
+        volumetricFlowRate  constant $Qc;
+        value               uniform (0.00390355 0 0);
+    }
+    waterInlet
+    {
+        type                flowRateInletVelocity;
+        volumetricFlowRate  constant $Qd;
+        value               uniform (0 -0.00195178 0);
+    }
+    outlet
+    {
+        type            pressureInletOutletVelocity;
+        value           uniform (0 0 0);
+    }
+    walls { type noSlip; }
+    bottom { type noSlip; }
+    membrane { type noSlip; }
+}

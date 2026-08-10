@@ -1,0 +1,2 @@
+FoamFile { format ascii; class uniformDimensionedVectorField; object g; }
+#include "../../common/g"

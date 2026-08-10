@@ -1,29 +1,8 @@
-# Python
 __pycache__/
 *.py[cod]
-*$py.class
-*.so
-.Python
-build/
-develop-eggs/
-dist/
-downloads/
-eggs/
-.eggs/
-lib/
-lib64/
-parts/
-sdist/
-var/
-wheels/
-*.egg-info/
-.installed.cfg
-*.egg
-MANIFEST
 .pytest_cache/
 .coverage
 
-# IDEs
 .vscode/
 .idea/
 *.swp
@@ -31,11 +10,10 @@ MANIFEST
 *~
 .DS_Store
 
-# OpenFOAM
 processor*/
 0.*/
 [1-9]*/
-[1-9]*.*
+[1-9]*.*/
 constant/polyMesh/
 0/polyMesh/
 VTK/
@@ -43,47 +21,11 @@ postProcessing/
 log.*
 *.foam
 
-#*.jpg
-
-# Temporary files
-*.tmp
-*.bak
-*.backup
-*.swp
-.~*
-
-# OS
-.DS_Store
-Thumbs.db
-.directory
-
-# Paraview
 *.pvd
 *.vtu
 *.vtp
 *.vtm
-
-# Mesh files (generated)
 *.msh
-
-COMPLETE_RESTRUCTURE_SUMMARY.md
-FIXES_APPLIED.md
-PRESENTATION_CHEAT_SHEET.md
-PRESENTATION_VISUALS_README.md
-PROJECT_FSI_INFO.md
-QUICK_REFERENCE_CARD.md
-SIMULATION_GUIDE.md
-STEP_BY_STEP_COMMANDS.md
-TERMINAL_VISUAL_GUIDE.md
-VISUALIZATION_GUIDE.md
-
-droplet_pipe_fsi_sim.py
-# Markdown files - exclude all except README.md
-*.md
-!README.md
-# Helper scripts to exclude
-generate_all_visuals.py
-opencode.json
-
-# Helper script directories
-presentation_visuals/
+*.tmp
+*.bak
+*.backup
