@@ -31,6 +31,9 @@ Check only the input files and meshes:
 
 Results are written to `validation_results.csv`.
 
+The complete calculation method and limitations are documented in
+`VALIDATION.md`.
+
 From the repository root, open the results with:
 
 ```bash

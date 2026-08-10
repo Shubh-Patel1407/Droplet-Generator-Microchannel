@@ -14,6 +14,7 @@ cases/
     Allrun                 Meshes and runs both cases
     Allclean               Removes generated case data
     validate.py            Calculates the comparison table
+    VALIDATION.md          Method, equations, results, and limitations
     validation_results.csv Current numerical results
 references/
   deformable-microchannel-study.pdf
@@ -61,6 +62,8 @@ Current calculated values:
 The simulation values are calculated from the largest detached-region volume.
 These are the actual current numerical differences and should not be described
 as agreement within a validation tolerance.
+
+See `cases/flexible-rigid/VALIDATION.md` for the complete calculation method.
 
 Recalculate the table without rerunning OpenFOAM:
 
