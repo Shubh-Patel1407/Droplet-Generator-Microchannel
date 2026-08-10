@@ -1,0 +1,56 @@
+solvers
+{
+    "alpha.water.*"
+    {
+        nCorrectors     2;
+        nSubCycles      2;
+        MULESCorr       yes;
+        MULES
+        {
+            nIter       5;
+            tolerance   1e-2;
+        }
+        solver          smoothSolver;
+        smoother        symGaussSeidel;
+        tolerance       1e-9;
+        relTol          0;
+    }
+    "pcorr.*"
+    {
+        solver          PCG;
+        preconditioner  DIC;
+        tolerance       1e-5;
+        relTol          0;
+    }
+    p_rgh
+    {
+        solver          GAMG;
+        tolerance       1e-8;
+        relTol          0.01;
+        smoother        GaussSeidel;
+    }
+    p_rghFinal
+    {
+        $p_rgh;
+        relTol          0;
+    }
+    U
+    {
+        solver          smoothSolver;
+        smoother        symGaussSeidel;
+        tolerance       1e-8;
+        relTol          0.05;
+    }
+    UFinal
+    {
+        $U;
+        relTol          0;
+    }
+}
+PIMPLE
+{
+    momentumPredictor yes;
+    nOuterCorrectors  1;
+    nCorrectors       2;
+    nNonOrthogonalCorrectors 0;
+}

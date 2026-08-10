@@ -1,0 +1,6 @@
+FoamFile { format ascii; class dictionary; object blockMeshDict; }
+zMin -0.00005;
+zMax  0.00005;
+nDepth 10;
+#include "../../common/blockMeshBody"
+

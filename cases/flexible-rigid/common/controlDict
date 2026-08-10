@@ -1,0 +1,49 @@
+solver          incompressibleVoF;
+startFrom       startTime;
+startTime       0;
+stopAt          endTime;
+endTime         0.12;
+deltaT          1e-6;
+writeControl    adjustableRunTime;
+writeInterval   0.002;
+purgeWrite      0;
+writeFormat     ascii;
+writeCompression off;
+timeFormat      general;
+timePrecision   8;
+runTimeModifiable true;
+adjustTimeStep  yes;
+maxCo           0.25;
+maxAlphaCo      0.15;
+maxDeltaT       2e-5;
+
+functions
+{
+    phaseVolume
+    {
+        type            volFieldValue;
+        libs            ("libfieldFunctionObjects.so");
+        fields          (alpha.water);
+        operation       volIntegrate;
+        cellZone        all;
+        writeFields     false;
+        writeControl    timeStep;
+        writeInterval   20;
+    }
+    dropletSizes
+    {
+        type            regionSizeDistribution;
+        libs            ("libfieldFunctionObjects.so");
+        alpha           alpha.water;
+        patches         (waterInlet);
+        threshold       0.5;
+        fields          (U);
+        nBins           80;
+        // Required by OpenFOAM 13 for small satellite regions.
+        minDiameter     0;
+        maxDiameter     5e-4;
+        setFormat       raw;
+        writeControl    adjustableRunTime;
+        writeInterval   0.01;
+    }
+}

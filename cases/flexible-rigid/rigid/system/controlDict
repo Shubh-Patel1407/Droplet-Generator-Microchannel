@@ -1,0 +1,2 @@
+FoamFile { format ascii; class dictionary; object controlDict; }
+#include "../../common/controlDict"

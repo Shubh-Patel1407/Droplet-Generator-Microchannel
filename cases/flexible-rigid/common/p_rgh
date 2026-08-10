@@ -1,0 +1,12 @@
+dimensions      [1 -1 -2 0 0 0 0];
+internalField   uniform 0;
+boundaryField
+{
+    oilInlet { type fixedFluxPressure; value uniform 0; }
+    waterInlet { type fixedFluxPressure; value uniform 0; }
+    outlet { type fixedValue; value uniform 0; }
+    walls { type fixedFluxPressure; value uniform 0; }
+    bottom { type fixedFluxPressure; value uniform 0; }
+    membrane { type fixedFluxPressure; value uniform 0; }
+}
+

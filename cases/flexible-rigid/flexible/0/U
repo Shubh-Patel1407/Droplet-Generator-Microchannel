@@ -1,0 +1,5 @@
+FoamFile { format ascii; class volVectorField; object U; }
+// Scale flow rates by effective-height ratio to preserve Ca and r.
+Qc 3.65082e-11;
+Qd 1.82541e-11;
+#include "../../common/U"

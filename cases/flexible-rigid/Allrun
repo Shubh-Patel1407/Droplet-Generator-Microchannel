@@ -1,0 +1,40 @@
+#!/bin/bash
+set -e
+
+cd "${0%/*}"
+
+if [ -z "${WM_PROJECT_DIR:-}" ]; then
+    if [ -f /opt/openfoam13/etc/bashrc ]; then
+        . /opt/openfoam13/etc/bashrc
+    else
+        echo "OpenFOAM environment is not loaded" >&2
+        exit 1
+    fi
+fi
+
+set -u
+
+mesh_only=false
+if [ "${1:-}" = "--mesh-only" ]; then
+    mesh_only=true
+fi
+
+for case_name in rigid flexible; do
+    echo "Preparing $case_name case"
+    blockMesh -case "$case_name" > "$case_name/log.blockMesh" 2>&1
+    checkMesh -case "$case_name" > "$case_name/log.checkMesh" 2>&1
+    if ! grep -q "Mesh OK" "$case_name/log.checkMesh"; then
+        echo "$case_name mesh failed checkMesh" >&2
+        exit 1
+    fi
+    setFields -case "$case_name" > "$case_name/log.setFields" 2>&1
+
+    if [ "$mesh_only" = false ]; then
+        echo "Running $case_name case"
+        foamRun -case "$case_name" -solver incompressibleVoF > "$case_name/log.foamRun" 2>&1
+    fi
+done
+
+if [ "$mesh_only" = false ]; then
+    python3 validate.py
+fi
